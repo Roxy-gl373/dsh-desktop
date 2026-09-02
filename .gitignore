@@ -6,6 +6,9 @@ state/
 # --- build output (regenerate with build.ps1) ---
 bin/Dwhale.exe
 
+# --- publish output (regenerate with publish.ps1) ---
+release/
+
 # WebView2 SDK is restored by build.ps1 (nuget) — do not commit the DLLs.
 bin/Microsoft.Web.WebView2.Core.dll
 bin/Microsoft.Web.WebView2.WinForms.dll

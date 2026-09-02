@@ -56,10 +56,16 @@ $cmd = @($csc) + @('/nologo','/target:winexe','/platform:anycpu','/optimize+','/
 foreach ($r in $refs) { $cmd += ('/r:' + $r) }
 $cmd += $sources
 
+$manifest = Join-Path $pkg 'src\app.manifest'
+if (-not (Test-Path $manifest)) { $manifest = $null }
 Write-Output "csc: $csc"
 Write-Output "WebView2 SDK: $wv2Core / $wv2WinForms"
 Write-Output "sources: $($sources -join ', ')"
-& $csc /nologo /target:winexe /platform:anycpu /optimize+ "/win32icon:$ico" "/out:$Out" $(foreach ($r in $refs) { "/r:$r" }) $sources
+$cmdline = @('/nologo','/target:winexe','/platform:anycpu','/optimize+',"/win32icon:$ico","/out:$Out")
+if ($manifest) { $cmdline += "/win32manifest:$manifest" }
+foreach ($r in $refs) { $cmdline += ("/r:" + $r) }
+$cmdline += $sources
+& $csc $cmdline
 if ($LASTEXITCODE -ne 0) { throw "csc failed (exit $LASTEXITCODE)" }
 
 # ship the WebView2 loader + managed dlls next to the exe

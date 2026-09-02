@@ -18,5 +18,5 @@
   "iconPath": "<package>\\bin\\dps.ico",
   "configPath": "<package>\\config.json",
   "updateUrl": "https://api.github.com/repos/<owner>/<repo>/releases/latest",
-  "appVersion": "1.1.0"
+  "appVersion": "1.0.1"
 }

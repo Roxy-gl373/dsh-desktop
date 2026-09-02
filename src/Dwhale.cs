@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
 using System.Web.Script.Serialization;
@@ -390,11 +391,64 @@ namespace DshWhale
         }
     }
 
+    public sealed class SingleInstance : IDisposable
+    {
+        readonly Mutex mutex;
+        public EventWaitHandle ShowEvent { get; private set; }
+        public bool IsPrimary { get; private set; }
+
+        public SingleInstance(string name)
+        {
+            // Session-local named mutex: only one DSh Whale per user/logon session.
+            mutex = new Mutex(false, "Local\\" + name);
+            try { IsPrimary = mutex.WaitOne(0, false); }
+            catch { IsPrimary = true; } // an abandoned/odd mutex: err on the side of running
+            if (IsPrimary)
+            {
+                // Primary instance: keep the mutex for its lifetime and expose a "show me" event.
+                try { ShowEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\" + name + ".Show"); }
+                catch { ShowEvent = null; }
+            }
+            else
+            {
+                // A second instance: ask the running one to bring its window forward, then exit.
+                try { var e = EventWaitHandle.OpenExisting("Local\\" + name + ".Show"); e.Set(); } catch { }
+            }
+        }
+
+        public void Dispose()
+        {
+            try { if (ShowEvent != null) ShowEvent.Dispose(); } catch { }
+            try { if (IsPrimary) mutex.ReleaseMutex(); } catch { }
+            try { mutex.Dispose(); } catch { }
+        }
+    }
+
     public static class Program
     {
+        // Make the process per-monitor-V2 DPI aware before any window is created, so the
+        // embedded WebView2 renders at native pixel density instead of being bitmap-scaled (blurry).
+        [DllImport("user32.dll")]
+        static extern bool SetProcessDpiAwarenessContext(IntPtr value);
+        [DllImport("user32.dll")]
+        static extern bool SetProcessDPIAware();
+
+        static void EnableDpiAwareness()
+        {
+            try
+            {
+                // PER_MONITOR_AWARE_V2 = -4. If the OS doesn't support it, fall back to system-aware.
+                if (SetProcessDpiAwarenessContext(new IntPtr(-4))) return;
+            }
+            catch { }
+            try { SetProcessDPIAware(); } catch { }
+        }
+
         [STAThread]
         public static void Main(string[] args)
         {
+            EnableDpiAwareness();
+
             string dir = AppDomain.CurrentDomain.BaseDirectory;
             string cfgPath = Path.Combine(dir, "config.json");
             if (!File.Exists(cfgPath))
@@ -423,11 +477,19 @@ namespace DshWhale
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            var launcher = new Launcher(cfg);
-            launcher.Start();
+            // Single-instance guard: repeated launches bring the running window to the front
+            // instead of spawning another window + tray icon.
+            using (var single = new SingleInstance("DShWhale.Launcher"))
+            {
+                if (!single.IsPrimary) { return; }
 
-            var form = new MainForm(launcher);
-            Application.Run(form);
+                var launcher = new Launcher(cfg);
+                launcher.Start();
+
+                var form = new MainForm(launcher);
+                form.BindShowSignal(single.ShowEvent);
+                Application.Run(form);
+            }
         }
     }
 }

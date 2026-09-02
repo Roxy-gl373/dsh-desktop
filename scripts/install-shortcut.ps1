@@ -1,4 +1,4 @@
-﻿# install-shortcut.ps1 — resolves DSH paths, writes config.json, and creates the Desktop shortcut.
+# install-shortcut.ps1 — resolves DSH paths, writes config.json, and creates the Desktop shortcut.
 #
 #   powershell -NoProfile -ExecutionPolicy Bypass -File install-shortcut.ps1
 #   powershell -NoProfile -ExecutionPolicy Bypass -File install-shortcut.ps1 -NoShortcut
@@ -71,7 +71,7 @@ $config = [ordered]@{
     iconPath       = $ico
     configPath     = (Join-Path $pkgRoot 'config.json')
     updateUrl      = ''
-    appVersion     = '1.1.0'
+    appVersion     = '1.0.1'
 }
 
 Write-Output "packageRoot = $pkgRoot"

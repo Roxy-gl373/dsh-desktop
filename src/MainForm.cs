@@ -25,6 +25,12 @@ namespace DshWhale
         ToolStripMenuItem openNewVersionItem;
         volatile string latestTag;
         volatile string latestUrl;
+        bool autoFit = true;
+        double fitBaseWidth = 0;
+        double zoom = 1.0;
+        System.Windows.Forms.Timer resizeDebounce;
+        ToolStripButton fitButton;
+        readonly List<WebWindow> openWindows = new List<WebWindow>();
 
         public MainForm(Launcher launcher)
         {
@@ -43,6 +49,10 @@ namespace DshWhale
             BuildStatusStrip();
             SetupTray();
 
+            resizeDebounce = new System.Windows.Forms.Timer { Interval = 160 };
+            resizeDebounce.Tick += (s, e) => { resizeDebounce.Stop(); ApplyFitZoom(); };
+            Resize += (s, e) => { if (autoFit) { resizeDebounce.Stop(); resizeDebounce.Start(); } };
+
             l.OnNotify += OnNotifyRaised;
             l.OnServerUpChanged += OnServerUpRaised;
             l.OnStateChanged += OnStateRaised;
@@ -59,6 +69,7 @@ namespace DshWhale
         {
             var ts = new ToolStrip { Dock = DockStyle.Top, GripStyle = ToolStripGripStyle.Hidden };
             ts.Items.Add(MakeButton("刷新", (s, e) => Navigate(true)));
+            ts.Items.Add(MakeButton("新建窗口", (s, e) => NewWindow()));
             ts.Items.Add(MakeButton("重启服务", (s, e) => { l.RestartServer("manual toolbar"); }));
             ts.Items.Add(MakeButton("快照", (s, e) => { l.RunSnapshot("manual"); NotifyTooltip("已创建快照"); }));
             ts.Items.Add(MakeButton("验证", (s, e) => { l.RunVerify(); NotifyTooltip("验证完成"); }));
@@ -67,10 +78,46 @@ namespace DshWhale
             ts.Items.Add(new ToolStripDropDownButton("安全") { DropDownItems = { rollbackItem } });
             ts.Items.Add(MakeButton("状态面板", (s, e) => ShowSafetyDialog()));
             ts.Items.Add(new ToolStripSeparator());
+            fitButton = new ToolStripButton("等比缩放") { CheckOnClick = true, Checked = true };
+            fitButton.CheckedChanged += (s, e) => {
+                autoFit = fitButton.Checked;
+                if (autoFit) { fitBaseWidth = 0; resizeDebounce.Start(); }
+                else { SetZoom(1.0); }
+            };
+            ts.Items.Add(fitButton);
+            ts.Items.Add(MakeButton("缩小", (s, e) => SetZoom(zoom - 0.1)));
+            ts.Items.Add(MakeButton("100%", (s, e) => SetZoom(1.0)));
+            ts.Items.Add(MakeButton("放大", (s, e) => SetZoom(zoom + 0.1)));
+            ts.Items.Add(new ToolStripSeparator());
             ts.Items.Add(MakeButton("打开日志", (s, e) => OpenFolder(l.Cfg.logDir)));
             ts.Items.Add(MakeButton("浏览器打开", (s, e) => l.OpenExternalBrowser()));
             ts.Items.Add(MakeButton("最小化到托盘", (s, e) => HideToTray()));
             Controls.Add(ts);
+        }
+
+        // ---------- zoom (proportional / manual) ----------
+        void SetZoom(double z)
+        {
+            autoFit = false;
+            if (fitButton != null) { fitButton.Checked = false; }
+            zoom = Math.Max(0.25, Math.Min(4.0, z));
+            try { if (webView.CoreWebView2 != null) webView.ZoomFactor = zoom; } catch { }
+            statusServer.Text = "缩放 " + Math.Round(zoom * 100) + "%";
+        }
+
+        void ApplyFitZoom()
+        {
+            try
+            {
+                if (webView.CoreWebView2 == null) return;
+                int w = webView.ClientSize.Width;
+                if (w <= 0) return;
+                if (fitBaseWidth <= 0) { fitBaseWidth = w; zoom = 1.0; }
+                else { zoom = Math.Max(0.25, Math.Min(4.0, (double)w / fitBaseWidth)); }
+                webView.ZoomFactor = zoom;
+                statusServer.Text = "等比缩放 " + Math.Round(zoom * 100) + "%";
+            }
+            catch { }
         }
 
         void BuildWebView()
@@ -108,6 +155,7 @@ namespace DshWhale
             var menu = new ContextMenuStrip();
             menu.Items.Add("显示窗口", null, (s, e) => ShowFromTray());
             menu.Items.Add("打开 Web 界面", null, (s, e) => { ShowFromTray(); Navigate(true); });
+            menu.Items.Add("新建窗口", null, (s, e) => { ShowFromTray(); NewWindow(); });
             menu.Items.Add("重启服务", null, (s, e) => l.RestartServer("tray"));
             menu.Items.Add("打开日志文件夹", null, (s, e) => OpenFolder(l.Cfg.logDir));
             rollbackItem = new ToolStripMenuItem("回滚到上一个好的快照");
@@ -145,6 +193,14 @@ namespace DshWhale
                 try { Directory.CreateDirectory(wvDir); } catch { }
                 var env = await CoreWebView2Environment.CreateAsync(null, wvDir);
                 await webView.EnsureCoreWebView2Async(env);
+                try
+                {
+                    // Enable native zoom shortcuts (Ctrl+scroll, Ctrl+/-, Ctrl+0) and fit.
+                    webView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = true;
+                    webView.CoreWebView2.Settings.IsZoomControlEnabled = true;
+                    webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+                }
+                catch { }
                 webView.Source = new Uri(l.WebUrl);
             }
             catch (Exception ex)
@@ -166,13 +222,39 @@ namespace DshWhale
         public void HideToTray() { Hide(); }
         void ShowFromTray() { Show(); WindowState = FormWindowState.Normal; Activate(); }
 
+        // Listens for the single-instance "show me" signal so a second launch brings this
+        // window forward instead of creating another instance (and another tray icon).
+        public void BindShowSignal(EventWaitHandle ev)
+        {
+            if (ev == null) return;
+            var t = new Thread(() =>
+            {
+                while (!exiting)
+                {
+                    try { ev.WaitOne(); } catch { return; }
+                    Marshal(() => ShowFromTray());
+                }
+            }) { IsBackground = true, Name = "dsh-whale-show" };
+            t.Start();
+        }
+
         void ExitApp()
         {
             exiting = true;
             try { tray.Visible = false; tray.Dispose(); } catch { }
+            try { foreach (var w in openWindows.ToArray()) { w.Close(); } } catch { }
             l.Shutdown();
             Close();
             Application.Exit();
+        }
+
+        void NewWindow()
+        {
+            var w = new WebWindow(l);
+            w.NewWindowRequested += () => NewWindow();
+            w.FormClosed += (s, e) => openWindows.Remove(w);
+            openWindows.Add(w);
+            w.Show();
         }
 
         void OpenFolder(string dir)
