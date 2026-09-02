@@ -1,0 +1,21 @@
+# --- machine-generated / runtime data (never commit) ---
+config.json
+logs/
+state/
+
+# --- build output (regenerate with build.ps1) ---
+bin/Dwhale.exe
+
+# WebView2 SDK is restored by build.ps1 (nuget) — do not commit the DLLs.
+bin/Microsoft.Web.WebView2.Core.dll
+bin/Microsoft.Web.WebView2.WinForms.dll
+bin/WebView2Loader.dll
+
+# WebView2 browser profile (runtime cache) — never commit.
+bin/**/*.WebView2/
+bin/*.WebView2/
+
+# --- misc ---
+*.user
+TestResults/
+bin/*.pdb

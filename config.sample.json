@@ -1,0 +1,22 @@
+{
+  "$comment": "Template for config.json. Do NOT commit the real config.json. Run scripts\\install-shortcut.ps1 to generate a machine-correct config.json from this machine's paths.",
+  "appName": "DSh Whale · DeepSeek Harness",
+  "nodePath": "C:\\Program Files\\nodejs\\node.exe",
+  "dshBinJs": "C:\\Users\\<you>\\AppData\\Local\\npm-cache\\_npx\\<hash>\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js",
+  "dshCmd": "",
+  "dshHome": "C:\\Users\\<you>\\.dsh",
+  "webProfile": "web",
+  "webHost": "127.0.0.1",
+  "webPort": 3080,
+  "healthTimeoutMs": 90000,
+  "pollIntervalMs": 3000,
+  "logDir": "<package>\\logs",
+  "stateDir": "<package>\\state",
+  "snapshotDir": "<package>\\state\\snapshots",
+  "manifestPath": "<package>\\state\\manifest.json",
+  "safetyScript": "<package>\\scripts\\dsh-safety.ps1",
+  "iconPath": "<package>\\bin\\dps.ico",
+  "configPath": "<package>\\config.json",
+  "updateUrl": "https://api.github.com/repos/<owner>/<repo>/releases/latest",
+  "appVersion": "1.1.0"
+}
