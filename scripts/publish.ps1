@@ -50,6 +50,7 @@ foreach ($f in @('install-shortcut.ps1','dsh-safety.ps1','convert-icon.ps1')) {
 }
 # docs + template + one-click entry
 Copy-Item -Path (Join-Path $pkg 'README.md') -Destination $stage -Force
+Copy-Item -Path (Join-Path $pkg 'RELEASE_NOTES.md') -Destination $stage -Force
 Copy-Item -Path (Join-Path $pkg 'CHANGELOG.md') -Destination $stage -Force
 Copy-Item -Path (Join-Path $pkg 'LICENSE') -Destination $stage -Force
 if (Test-Path (Join-Path $pkg 'docs')) { Copy-Item -Path (Join-Path $pkg 'docs') -Destination $stage -Recurse -Force }
