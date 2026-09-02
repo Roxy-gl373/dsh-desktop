@@ -60,17 +60,31 @@ dsh-desktop\
 
 ## 安装
 
-1. 前置：Node.js、pnpm、.NET Framework 4.x、WebView2 运行时（Windows 10/11 一般自带）。
-2. （可选）构建 exe：
-   ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build.ps1
-   ```
-   `build.ps1` 自动寻找 WebView2 SDK（优先 `lib\webview2\`，其次 `bin\`，再尝试 Office 内置位置）。网络可用时可 `dotnet add package Microsoft.Web.WebView2` 后把三个 DLL 放入 `lib\webview2\`。
-3. 生成本机配置与桌面快捷方式：
-   ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install-shortcut.ps1
-   ```
-   桌面出现 `DSh Web 鲸鱼娘.lnk`，双击即用。只想生成配置用 `-NoShortcut`；只看结果用 `-DryRun`。
+### 1. 前置准备
+- **Windows 10/11**
+- **Node.js**：启动器用 `node` 跑 dsh，必需。
+- **pnpm**：`npm i -g pnpm`。
+- **DeepSeek Harness（dsh）本体**：启动器只是去启动 `dsh --profile web`，**不打包 DSH**；新机器需先装好 dsh 及所需的皮肤/插件（可用 `dsh plugin --profile web add …`，或交给 AI 按仓库指引装）。
+- **WebView2 运行时**（Win10/11 一般随 Edge 自带）+ **.NET Framework 4.x**（自带）。
+
+### 2. 获取程序
+- **方式 A（推荐，新机器免构建）**：解压 `DSh-Whale-1.0.1.zip` 到任意目录。
+- **方式 B（从仓库构建）**：
+  ```powershell
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build.ps1
+  ```
+  `build.ps1` 自动用 csc 编译出 `bin\Dwhale.exe` 并定位 WebView2 SDK（网络可用时可先 `dotnet add package Microsoft.Web.WebView2`，把三个 DLL 放入 `lib\webview2\`）。
+
+### 3. 配置（生成 config.json + 桌面快捷方式）
+在解压/仓库目录运行：
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install-shortcut.ps1
+```
+会自动探测本机 `node`/`dsh` 路径、生成 `config.json` 并创建桌面「DSh Web」快捷方式。
+> 只要配置不要快捷方式：加 `-NoShortcut`；只看结果不写文件：加 `-DryRun`。
+
+### 4. 启动
+双击桌面「DSh Web」快捷方式（或 `bin\Dwhale.exe`）。端口 `127.0.0.1:3080` 已有 dsh 服务则复用，否则自动拉起并打开内嵌网页。重复双击只唤起已有窗口（单实例，一个托盘图标）。
 
 ---
 
@@ -122,3 +136,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\dsh-safety.ps1 `
 - 写入真实的 `%USERPROFILE%\.dsh`（默认 `DSH_HOME`）。回滚会还原 `~/.dsh/profiles/web\package.json`、`pnpm-lock.yaml`、`cordis.patch.yml` 与 `~/.dsh\cordis.patch.yml`。
 - 首次装新插件包需重启一次 DSH（新增/删除包才重启；切皮肤/换配置走热重载）。
 - WebView2 需要运行时；若内嵌窗口初始化失败，状态栏会提示，此时可用「浏览器打开」。
+
+---
+
+> 📌 **提示**：你也可以把本仓库地址发给任意 AI 助手，让 AI 按上面的安装流程自动帮你完成环境检测、安装皮肤/插件与首次配置。
+> 例如对 AI 说：*“读取本仓库 README 的安装流程，并按步骤帮我在本机装好。”*
